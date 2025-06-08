@@ -1,0 +1,20 @@
+const mqtt = require('mqtt')
+
+// Ganti dengan kredensial dan URL broker kamu
+const brokerUrl = 'mqtt://c-greenproject.org'
+const options = {
+  username: 'climate',
+  password: 'pwdMQTT@123'
+}
+
+const client = mqtt.connect(brokerUrl, options)
+
+client.on('connect', function () {
+  console.log('Terhubung ke MQTT broker!')
+  client.end()
+})
+
+client.on('error', function (err) {
+  console.log('Gagal terhubung:', err.message)
+  client.end()
+})
