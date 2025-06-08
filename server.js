@@ -22,6 +22,11 @@ app.use('/api/carbon-predict', carbonPredictRoutes);
 app.use('/api/carbon', carbonRoutes);
 app.use('/api/microclimate', microclimateRoutes);
 
+// Route root untuk respon default
+app.get('/', (req, res) => {
+  res.send('Express Backend is running!');
+});
+
 app.listen(PORT, () => {
   console.log(`Backend server is running on http://localhost:${PORT}`);
 });
