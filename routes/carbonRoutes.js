@@ -6,5 +6,6 @@ router.get('/db', ctl.getCO2Last10);
 router.get('/db/simulate', ctl.getRealtimeSimulatedCO2);
 router.get('/stream', ctl.getCO2Stream);
 router.get('/download', ctl.downloadCO2);
+router.get('/download-range', ctl.downloadCO2Range);
 
 module.exports = router;

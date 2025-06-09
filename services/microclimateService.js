@@ -57,3 +57,24 @@ exports.downloadMicro = async (year, month, day, hour, minute, limit = 1000) => 
   const { rows } = await poolClimate.query(sql, params);
   return rows;
 };
+
+// downlad by range date
+exports.downloadMicroByRange = async (start_date, end_date, limit) => {
+  let sql = `SELECT timestamp, rainfall, temperature, pyrano, humidity FROM microclimate_kalimantan WHERE 1=1`;
+  const params = [];
+  if (start_date) {
+    sql += ` AND timestamp >= $${params.length + 1}`;
+    params.push(start_date);
+  }
+  if (end_date) {
+    sql += ` AND timestamp <= $${params.length + 1}`;
+    params.push(end_date);
+  }
+  sql += ` ORDER BY timestamp ASC`;
+  if (limit) {
+    sql += ` LIMIT $${params.length + 1}`;
+    params.push(limit);
+  }
+  const { rows } = await poolClimate.query(sql, params);
+  return rows;
+};

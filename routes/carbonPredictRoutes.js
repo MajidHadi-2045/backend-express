@@ -14,4 +14,7 @@ router.get('/stream', ctl.getLivePrediction);
 // Downlaod data
 router.get('/download', ctl.downloadPredict);
 
+// Download by range date
+router.get('/download-range', ctl.downloadPredictRange);
+
 module.exports = router;

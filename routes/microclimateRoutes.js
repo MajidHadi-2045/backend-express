@@ -6,5 +6,6 @@ router.get('/db', ctl.getMicroLast10);
 router.get('/db/simulate', ctl.getRealtimeSimulatedMicro);
 router.get('/stream', ctl.getMicroStream);
 router.get('/download', ctl.downloadMicro);
+router.get('/download-range', ctl.downloadMicroRange);
 
 module.exports = router;

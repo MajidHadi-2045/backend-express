@@ -65,3 +65,25 @@ exports.downloadMicro = async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 };
+
+// downlad by range date
+exports.downloadMicroRange = async (req, res) => {
+  try {
+    const { start_date, end_date, limit } = req.query;
+    const data = await microclimateService.downloadMicroByRange(
+      start_date,
+      end_date,
+      limit ? parseInt(limit) : undefined
+    );
+    if (!data.length) return res.status(404).json({ error: 'No data found' });
+    const parser = new Parser({ fields: ['timestamp', 'rainfall', 'temperature', 'pyrano', 'humidity'] });
+    const csv = parser.parse(data);
+    res.header('Content-Type', 'text/csv');
+    res.attachment(
+      `microclimate_${start_date || 'all'}_to_${end_date || 'all'}.csv`
+    );
+    res.send(csv);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
