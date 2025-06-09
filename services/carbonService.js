@@ -57,7 +57,7 @@ exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000) => {
 };
 
 // downlad by range date
-exports.downloadCO2ByRange = async (start_date, end_date, limit) => {
+exports.downloadCO2ByRange = async (start_date, end_date) => {
   let sql = `SELECT timestamp, co2 FROM station2s WHERE 1=1`;
   const params = [];
   if (start_date) {
@@ -69,10 +69,6 @@ exports.downloadCO2ByRange = async (start_date, end_date, limit) => {
     params.push(end_date);
   }
   sql += ` ORDER BY timestamp ASC`;
-  if (limit) {
-    sql += ` LIMIT $${params.length + 1}`;
-    params.push(limit);
-  }
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };

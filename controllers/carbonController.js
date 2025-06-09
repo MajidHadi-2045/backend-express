@@ -57,11 +57,10 @@ exports.downloadCO2 = async (req, res) => {
 // downlad by range date
 exports.downloadCO2Range = async (req, res) => {
   try {
-    const { start_date, end_date, limit } = req.query;
+    const { start_date, end_date } = req.query;
     const data = await carbonService.downloadCO2ByRange(
       start_date,
-      end_date,
-      limit ? parseInt(limit) : undefined
+      end_date
     );
     if (!data.length) return res.status(404).json({ error: 'No data found' });
     const parser = new Parser({ fields: ['timestamp', 'co2'] });
