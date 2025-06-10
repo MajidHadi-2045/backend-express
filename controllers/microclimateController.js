@@ -6,7 +6,9 @@ const { Parser } = require('json2csv');
 // 10 data terakhir
 exports.getMicroLast10 = async (req, res) => {
   try {
-    const rows = await microclimateService.getLast10Micro();
+    // Ambil waktu window simulasi dari query jika ingin benar-benar sinkron
+    const { sim_time } = req.query;
+    const rows = await microclimateService.getLast10Micro(sim_time);
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -17,27 +19,17 @@ exports.getRealtimeSimulatedMicro = async (req, res) => {
   try {
     const nowWIB = moment.tz('Asia/Jakarta');
     const simDateWIB = nowWIB.clone().month(3).year(2025);
-    const simDateStr = simDateWIB.format('YYYY-MM-DD HH:mm:ss'); // LANGSUNG WIB!
+    const simDateStr = simDateWIB.format('YYYY-MM-DD HH:mm:ss');
     const toleranceSec = 300;
 
     const rows = await microclimateService.getSimulatedMicro(simDateStr, toleranceSec);
     if (!rows.length) return res.status(404).json({ error: 'No data found near simulated time' });
-
-    const data = rows[0];
-    const field = req.query.field;
-
-    if (field && ['rainfall', 'temperature', 'pyrano', 'humidity'].includes(field)) {
-      if (data[field] === undefined) {
-        return res.status(404).json({ error: `Field '${field}' not found` });
-      }
-      return res.json({ timestamp: data.timestamp, [field]: data[field] });
-    }
-
-    res.json(data);
+    res.json(rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 };
+
 
 // Endpoint MQTT stream (realtime)
 exports.getMicroStream = (req, res) => {

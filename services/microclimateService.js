@@ -1,17 +1,26 @@
 const { poolClimate } = require('../config/database');
 
 // 10 data terakhir microclimate bulan April 2025
-exports.getLast10Micro = async () => {
+exports.getLast10Micro = async (simDateStr = null) => {
   const start = '2025-04-01 00:00:00';
   const end   = '2025-04-30 23:59:59';
-  const { rows } = await poolClimate.query(
-    `SELECT timestamp, rainfall, temperature, pyrano, humidity 
-     FROM microclimate_kalimantan 
-     WHERE timestamp >= $1 AND timestamp <= $2 
-     ORDER BY timestamp DESC 
-     LIMIT 10`,
-    [start, end]
-  );
+
+  let timeFilter = '';
+  let params = [start, end];
+
+  if (simDateStr) {
+    timeFilter = "AND timestamp <= $3";
+    params.push(simDateStr);
+  }
+
+  let sql = `
+    SELECT timestamp, rainfall, temperature, pyrano, humidity
+    FROM microclimate_kalimantan
+    WHERE timestamp >= $1 AND timestamp <= $2 ${timeFilter}
+    ORDER BY timestamp DESC
+    LIMIT 10
+  `;
+  const { rows } = await poolClimate.query(sql, params);
   return rows;
 };
 

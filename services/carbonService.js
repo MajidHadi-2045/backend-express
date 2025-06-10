@@ -2,73 +2,120 @@ const { poolEddyKalimantan } = require('../config/database');
 
 // Ambil semua data histori CO2 (hanya timestamp, co2)
 // 10 data terakhir CO2 bulan April 2025
-exports.getLast10CO2 = async () => {
+exports.getLast10CO2 = async (simDateStr = null) => {
   const start = '2025-04-01 00:00:00';
   const end   = '2025-04-30 23:59:59';
-  const { rows } = await poolEddyKalimantan.query(
-    `SELECT timestamp, co2 
-     FROM station2s 
-     WHERE timestamp >= $1 AND timestamp <= $2 
-     ORDER BY timestamp DESC 
-     LIMIT 10`,
-    [start, end]
-  );
+
+  let windowFilter = '';
+  let params = [];
+  if (simDateStr) {
+    const simTimestamp = new Date(simDateStr).getTime() / 1000;
+    const windowStartSec = Math.floor(simTimestamp / 5) * 5;
+    const windowStart = new Date(windowStartSec * 1000).toISOString();
+    windowFilter = "AND window_start <= $1";
+    params.push(windowStart);
+  }
+  params.push(start, end);
+
+  let sql = `
+    WITH sampled AS (
+      SELECT
+        date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
+        mode() WITHIN GROUP (ORDER BY co2) AS co2_mode
+      FROM
+        station2s
+      WHERE
+        timestamp >= $${params.length - 1} AND timestamp <= $${params.length}
+      GROUP BY
+        window_start
+    )
+    SELECT *
+    FROM sampled
+    WHERE 1=1 ${windowFilter}
+    ORDER BY window_start DESC
+    LIMIT 10
+  `;
+  const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
 
-// Ambil data simulasi tolerant (hanya timestamp, co2)
-exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
-  const { rows } = await poolEddyKalimantan.query(
-    `
-    SELECT timestamp, co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
-    FROM station2s
-    WHERE 
-      timestamp >= '2025-04-01 00:00:00'
-      AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2
-    ORDER BY diff_s ASC
-    LIMIT 1
-    `,
-    [simDateStr, toleranceSec]
-  );
-  // Hilangkan diff_s sebelum return
-  return rows.map(({ timestamp, co2 }) => ({ timestamp, co2 }));
-};
 
-exports.insertCarbon = async (timestamp, co2) => {
-  await poolEddyKalimantan.query(
-    `INSERT INTO station2s (timestamp, co2) VALUES ($1, $2)`,
-    [timestamp, co2]
-  );
+// Ambil data simulasi tolerant (hanya timestamp, co2)
+exports.getSimulatedCO2 = async (simDateStr) => {
+  const simTimestamp = new Date(simDateStr).getTime() / 1000;
+  const windowStartSec = Math.floor(simTimestamp / 5) * 5;
+  const windowStart = new Date(windowStartSec * 1000).toISOString();
+
+  const sql = `
+    SELECT
+      mode() WITHIN GROUP (ORDER BY co2) AS co2_mode,
+      MIN(timestamp) as window_start
+    FROM
+      station2s
+    WHERE
+      timestamp >= $1
+      AND timestamp < ($1::timestamp + INTERVAL '5 second')
+  `;
+  const { rows } = await poolEddyKalimantan.query(sql, [windowStart]);
+  if (!rows.length || rows[0].co2_mode === null) return [];
+  return [{
+    window_start: windowStart,
+    co2_mode: rows[0].co2_mode
+  }];
 };
 
 // Dowload data
 exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000) => {
-  let sql = `SELECT timestamp, co2 FROM station2s WHERE 1=1`;
-  const params = [];
-  if (year)   { sql += ` AND EXTRACT(YEAR FROM timestamp) = $${params.length + 1}`; params.push(year); }
-  if (month)  { sql += ` AND EXTRACT(MONTH FROM timestamp) = $${params.length + 1}`; params.push(month); }
-  if (day)    { sql += ` AND EXTRACT(DAY FROM timestamp) = $${params.length + 1}`; params.push(day); }
-  if (hour)   { sql += ` AND EXTRACT(HOUR FROM timestamp) = $${params.length + 1}`; params.push(hour); }
-  if (minute) { sql += ` AND EXTRACT(MINUTE FROM timestamp) = $${params.length + 1}`; params.push(minute); }
-  sql += ` ORDER BY timestamp ASC LIMIT $${params.length + 1}`;
+  // Buat range waktu berdasarkan parameter, default null jika tidak ada
+  let conditions = [];
+  let params = [];
+  let sqlWhere = "";
+
+  if (year)   { conditions.push(`EXTRACT(YEAR FROM timestamp) = $${params.length + 1}`); params.push(year); }
+  if (month)  { conditions.push(`EXTRACT(MONTH FROM timestamp) = $${params.length + 1}`); params.push(month); }
+  if (day)    { conditions.push(`EXTRACT(DAY FROM timestamp) = $${params.length + 1}`); params.push(day); }
+  if (hour)   { conditions.push(`EXTRACT(HOUR FROM timestamp) = $${params.length + 1}`); params.push(hour); }
+  if (minute) { conditions.push(`EXTRACT(MINUTE FROM timestamp) = $${params.length + 1}`); params.push(minute); }
+  if (conditions.length > 0) {
+    sqlWhere = "WHERE " + conditions.join(" AND ");
+  }
+
+  // Query sampling per 5 detik modus
+  let sql = `
+    SELECT
+      date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
+      mode() WITHIN GROUP (ORDER BY co2) AS co2_mode
+    FROM
+      station2s
+    ${sqlWhere}
+    GROUP BY
+      window_start
+    ORDER BY
+      window_start ASC
+    LIMIT $${params.length + 1}
+  `;
   params.push(limit);
+
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
 
 // downlad by range date
 exports.downloadCO2ByRange = async (start_date, end_date) => {
-  let sql = `SELECT timestamp, co2 FROM station2s WHERE 1=1`;
-  const params = [];
-  if (start_date) {
-    sql += ` AND timestamp >= $${params.length + 1}`;
-    params.push(start_date);
-  }
-  if (end_date) {
-    sql += ` AND timestamp <= $${params.length + 1}`;
-    params.push(end_date);
-  }
-  sql += ` ORDER BY timestamp ASC`;
+  let sql = `
+    SELECT
+      date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
+      mode() WITHIN GROUP (ORDER BY co2) AS co2_mode
+    FROM
+      station2s
+    WHERE
+      timestamp >= $1 AND timestamp <= $2
+    GROUP BY
+      window_start
+    ORDER BY
+      window_start ASC
+  `;
+  const params = [start_date, end_date];
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
