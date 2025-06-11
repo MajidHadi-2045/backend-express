@@ -1,19 +1,20 @@
 const { poolClimate } = require('../config/database');
 
 // 10 data terakhir microclimate bulan April 2025
-// microclimateService.js - Modifikasi getLast10Micro
+// Modify getLast10Micro to get data based on the current time
 exports.getLast10Micro = async (simDateStr = null) => {
-  const start = '2025-04-01 00:00:00';
-  const end = '2025-04-30 23:59:59';
-  
+  const now = moment().tz('Asia/Jakarta'); // Get current time in WIB
+  const start = now.clone().startOf('day').format('YYYY-MM-DD HH:mm:ss'); // Start of today
+  const end = now.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss'); // End of today
+
   let timeFilter = '';
   let params = [start, end];
-  
+
   if (simDateStr) {
     timeFilter = "AND timestamp <= $3";
     params.push(simDateStr);
   }
-  
+
   let sql = `
     SELECT timestamp, rainfall, temperature, pyrano, humidity
     FROM microclimate_kalimantan
@@ -21,7 +22,7 @@ exports.getLast10Micro = async (simDateStr = null) => {
     ORDER BY timestamp DESC
     LIMIT 10
   `;
-  
+
   const { rows } = await poolClimate.query(sql, params);
   return rows;
 };
