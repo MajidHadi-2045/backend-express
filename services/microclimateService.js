@@ -2,15 +2,20 @@ const { poolClimate } = require('../config/database');
 
 // 10 data terakhir microclimate bulan April 2025
 exports.getLast10Micro = async (simDateStr = null) => {
-  const start = '2025-04-01 00:00:00';
-  const end   = '2025-04-30 23:59:59';
+  // Mengurangi 48 hari dari tanggal sekarang
+  const nowWIB = moment.tz('Asia/Jakarta');
+  const targetDate = nowWIB.subtract(48, 'days');  // Mengurangi 48 hari dari tanggal sekarang
+  const simDate = targetDate.format('YYYY-MM-DD HH:mm:ss');  // Menggunakan waktu lokal setelah pengurangan
+  
+  const start = '2025-04-25 00:00:00';
+  const end   = '2025-05-07 23:59:59';
 
   let timeFilter = '';
   let params = [start, end];
 
   if (simDateStr) {
     timeFilter = "AND timestamp <= $3";
-    params.push(simDateStr);
+    params.push(simDate);
   }
 
   let sql = `
@@ -24,9 +29,13 @@ exports.getLast10Micro = async (simDateStr = null) => {
   return rows;
 };
 
-
 // Simulasi tolerant (hanya field utama)
 exports.getSimulatedMicro = async (simDateStr, toleranceSec = 300) => {
+  // Mengurangi 48 hari dari tanggal sekarang
+  const nowWIB = moment.tz('Asia/Jakarta');
+  const targetDate = nowWIB.subtract(48, 'days');  // Mengurangi 48 hari dari tanggal sekarang
+  const simDate = targetDate.format('YYYY-MM-DD HH:mm:ss');  // Menggunakan waktu lokal setelah pengurangan
+
   const { rows } = await poolClimate.query(
     `
     SELECT timestamp, rainfall, temperature, pyrano, humidity, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
@@ -37,7 +46,7 @@ exports.getSimulatedMicro = async (simDateStr, toleranceSec = 300) => {
     ORDER BY diff_s ASC
     LIMIT 1
     `,
-    [simDateStr, toleranceSec]
+    [simDate, toleranceSec]
   );
   // Hilangkan diff_s sebelum return
   return rows.map(({ timestamp, rainfall, temperature, pyrano, humidity }) => ({
