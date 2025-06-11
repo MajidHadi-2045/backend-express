@@ -14,12 +14,11 @@ exports.getCO2Last10 = async (req, res) => {
   }
 };
 
-
 // Simulasi tolerant
 exports.getRealtimeSimulatedCO2 = async (req, res) => {
   try {
     const nowWIB = moment.tz('Asia/Jakarta');
-    const simDateWIB = nowWIB.clone().month(3).year(2025);
+    const simDateWIB = nowWIB.clone().month(3).year(2025); // Set tanggal April 2025
     const simDateUTC = simDateWIB.clone().tz('UTC');
     const simDateStr = simDateUTC.format('YYYY-MM-DD HH:mm:ss');
     const rows = await carbonService.getSimulatedCO2(simDateStr);
