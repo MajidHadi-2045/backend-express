@@ -1,63 +1,10 @@
-const moment = require('moment-timezone');  // Mengimpor moment dengan timezone
+const moment = require('moment');  // Mengimpor moment tanpa timezone
 const { poolEddyKalimantan } = require('../config/database');
 
-// Ambil data berdasarkan perhitungan tanggal sekarang
-exports.getLast10CO2 = async (simDateStr = null) => {
-  const nowWIB = moment.tz('Asia/Jakarta');  // Waktu sekarang di zona Jakarta
-
-  // Menghitung perbedaan hari antara tanggal 12 Juni 2025 dan 25 April 2025
-  const referenceDate = moment('2025-04-25');  // Tanggal referensi (25 April 2025)
-  const daysDifference = nowWIB.diff(referenceDate, 'days');  // Hitung perbedaan hari
-
-  // Sesuaikan tanggal yang diambil berdasarkan perbedaan hari
-  const simulatedDate = referenceDate.clone().add(daysDifference, 'days');  // Sesuaikan tanggal simulasi
-  simulatedDate.set({ hour: nowWIB.hour(), minute: nowWIB.minute(), second: nowWIB.second(), millisecond: nowWIB.millisecond() });
-
-  const startFormatted = simulatedDate.format('YYYY-MM-DD HH:mm:ss');
-
-  // Tentukan tanggal akhir, yaitu 7 Mei 2025
-  const endDate = moment('2025-05-07').set({ hour: nowWIB.hour(), minute: nowWIB.minute(), second: nowWIB.second(), millisecond: nowWIB.millisecond() });
-  const endFormatted = endDate.format('YYYY-MM-DD HH:mm:ss');
-
-  let params = [startFormatted, endFormatted];
-
-  // Query untuk mengambil data berdasarkan waktu yang disesuaikan
-  let sql = `
-    WITH sampled AS (
-      SELECT
-        date_trunc('minute', timestamp) AS window_start,  // Truncate to minute
-        mode() WITHIN GROUP (ORDER BY co2) AS co2_mode
-      FROM
-        co2_backend
-      WHERE
-        timestamp >= $${params.length - 1} AND timestamp <= $${params.length}
-      GROUP BY
-        window_start
-    )
-    SELECT *
-    FROM sampled
-    ORDER BY window_start DESC
-    LIMIT 10
-  `;
-  const { rows } = await poolEddyKalimantan.query(sql, params);
-
-  if (simDateStr) {
-    // Filter the data to apply 5-minute tolerance
-    const targetTimestamp = new Date(simDateStr).getTime();
-    const tolerance = 5 * 60 * 1000; // 5 minutes tolerance in milliseconds
-
-    // Find the closest data points within the 5-minute range
-    return rows.filter(row => {
-      const rowTimestamp = new Date(row.window_start).getTime();
-      return Math.abs(rowTimestamp - targetTimestamp) <= tolerance;
-    });
-  }
-
-  return rows;
-};
-
-// Simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
+// Ambil data berdasarkan perhitungan tanggal sekarang dengan waktu lokal (tanpa timezone)
 exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
+  console.log("Getting simulated CO2 data for:", simDateStr);  // Debug: Log simulated date
+  
   const { rows } = await poolEddyKalimantan.query(
     `
     SELECT timestamp, co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
@@ -70,6 +17,9 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
     `,
     [simDateStr, toleranceSec]
   );
+
+  console.log("Rows returned from query:", rows);  // Debug: Log returned rows
+  
   // Hilangkan diff_s sebelum return
   return rows.map(({ timestamp, co2 }) => ({
     timestamp, co2
@@ -77,8 +27,10 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
 };
 
 // Dowload data
-exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000) => {
-  // Buat range waktu berdasarkan parameter, default null jika tidak ada
+exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000, simDateStr) => {
+  // Debug log untuk parameter
+  console.log(`Download CO2 data with parameters: year=${year}, month=${month}, day=${day}, hour=${hour}, minute=${minute}, limit=${limit}, simulatedDate=${simDateStr}`);
+
   let conditions = [];
   let params = [];
   let sqlWhere = "";
@@ -92,7 +44,6 @@ exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000) => {
     sqlWhere = "WHERE " + conditions.join(" AND ");
   }
 
-  // Query untuk mengambil data dengan sampling per 5 detik modus
   let sql = `
     SELECT
       date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
@@ -108,12 +59,13 @@ exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000) => {
   `;
   params.push(limit);
 
+  console.log("SQL Query:", sql);  // Debug: Log SQL query
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
 
 // Download by range date
-exports.downloadCO2ByRange = async (start_date, end_date) => {
+exports.downloadCO2ByRange = async (start_date, end_date, simDateStr) => {
   let sql = `
     SELECT
       date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
@@ -128,6 +80,7 @@ exports.downloadCO2ByRange = async (start_date, end_date) => {
       window_start ASC
   `;
   const params = [start_date, end_date];
+  console.log("SQL Query:", sql);  // Debug: Log SQL query
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
