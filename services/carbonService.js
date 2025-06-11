@@ -63,6 +63,7 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
     `,
     [simDateStr, toleranceSec]
   );
+  
   // Hilangkan diff_s sebelum return
   return rows.map(({ timestamp, co2 }) => ({
     timestamp, co2
