@@ -8,7 +8,10 @@ exports.getMicroLast10 = async (req, res) => {
   try {
     const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
     const rows = await microclimateService.getLast10Micro(sim_time);  // Panggil service dengan simDateStr
-    res.json(rows);
+    res.json({
+      data: rows,
+      simulatedDate: rows.length ? rows[0].timestamp : null  // Mengembalikan tanggal dan waktu simulasi yang diambil
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -17,13 +20,17 @@ exports.getMicroLast10 = async (req, res) => {
 exports.getRealtimeSimulatedMicro = async (req, res) => {
   try {
     const nowWIB = moment.tz('Asia/Jakarta');
-    const simDateWIB = nowWIB.clone().month(3).year(2025);
+    const simDateWIB = nowWIB.clone().subtract(48, 'days');  // Mengurangi 48 hari dari tanggal sekarang
     const simDateStr = simDateWIB.format('YYYY-MM-DD HH:mm:ss');
     const toleranceSec = 300;
 
     const rows = await microclimateService.getSimulatedMicro(simDateStr, toleranceSec);
     if (!rows.length) return res.status(404).json({ error: 'No data found near simulated time' });
-    res.json(rows[0]);
+
+    res.json({
+      data: rows[0],
+      simulatedDate: simDateStr  // Menambahkan tanggal simulasi pada respons
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
