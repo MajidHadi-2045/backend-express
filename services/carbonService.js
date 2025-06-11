@@ -54,7 +54,7 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
   const { rows } = await poolEddyKalimantan.query(
     `
     SELECT timestamp, co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
-    FROM microclimate_kalimantan
+    FROM station2s
     WHERE 
       timestamp >= '2025-04-01 00:00:00'
       AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2
