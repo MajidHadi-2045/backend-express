@@ -50,24 +50,31 @@ exports.getLast10CO2 = async (simDateStr = null) => {
 };
 
 // Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
-exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
+exports.getSimulatedCO2 = async () => {
+  // Mengambil waktu saat ini dalam zona waktu Jakarta
+  const nowWIB = moment.tz('Asia/Jakarta');
+  
+  // Menentukan waktu dengan bulan dan tahun April 2025 tetapi jam, menit, detik mengikuti waktu saat ini
+  const simDateStr = nowWIB.clone().month(3).year(2025).format('YYYY-MM-DD HH:mm:ss');  // April 2025
+  
+  const toleranceSec = 300;  // Toleransi 5 menit = 300 detik
+
+  // Query untuk mendapatkan data dengan toleransi waktu 300 detik dari timestamp yang dihitung
   const { rows } = await poolEddyKalimantan.query(
     `
-    SELECT timestamp, co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
+    SELECT timestamp, co2, 
+           ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
     FROM station2s
-    WHERE 
-      timestamp >= '2025-04-01 00:00:00'  -- Rentang waktu mulai
-      AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2  -- Toleransi waktu (dalam detik)
-    ORDER BY diff_s ASC
-    LIMIT 1
+    WHERE timestamp >= '2025-04-01 00:00:00'  -- Rentang waktu mulai April 2025
+      AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2  -- Toleransi waktu (300 detik)
+    ORDER BY diff_s ASC  -- Urutkan berdasarkan kedekatan waktu
+    LIMIT 1;  -- Ambil data yang paling dekat dengan waktu saat ini
     `,
-    [simDateStr, toleranceSec]
+    [simDateStr, toleranceSec]  // Parameter: simDateStr (timestamp dengan bulan April 2025) dan toleranceSec (toleransi waktu)
   );
   
-  // Hilangkan diff_s sebelum return
-  return rows.map(({ timestamp, co2 }) => ({
-    timestamp, co2
-  }));
+  // Mengembalikan data yang ditemukan
+  return rows;
 };
 
 // Dowload data
