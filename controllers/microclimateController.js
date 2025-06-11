@@ -1,10 +1,6 @@
 const moment = require('moment-timezone');
 const microclimateService = require('../services/microclimateService');
-const cache = require('../cache');
 const { Parser } = require('json2csv');
-
-const moment = require('moment-timezone');
-const microclimateService = require('../services/microclimateService');
 
 // 10 data terakhir berdasarkan waktu sekarang
 exports.getMicroLast10 = async (req, res) => {
@@ -47,7 +43,7 @@ exports.getMicroStream = (req, res) => {
   res.json({ rainfall, temperature, pyrano, humidity, timestamp });
 };
 
-// dowload
+// Dowload data
 exports.downloadMicro = async (req, res) => {
   try {
     const { year, month, day, hour, minute } = req.query;
@@ -64,7 +60,7 @@ exports.downloadMicro = async (req, res) => {
   }
 };
 
-// downlad by range date
+// Download by range date
 exports.downloadMicroRange = async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
