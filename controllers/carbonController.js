@@ -1,4 +1,3 @@
-const moment = require('moment-timezone');
 const carbonService = require('../services/carbonService');
 
 exports.getCO2Last10 = async (req, res) => {
@@ -14,7 +13,7 @@ exports.getCO2Last10 = async (req, res) => {
 exports.getRealtimeSimulatedCO2 = async (req, res) => {
   try {
     const nowWIB = moment.tz('Asia/Jakarta');
-    const simDateWIB = nowWIB.clone().month(3).year(2025);
+    const simDateWIB = nowWIB.clone().month(3).year(2025); // 25 April 2025
     const simDateStr = simDateWIB.format('YYYY-MM-DD HH:mm:ss');
     const toleranceSec = 300;
 
