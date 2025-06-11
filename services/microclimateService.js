@@ -27,6 +27,7 @@ exports.getLast10Micro = async (simDateStr = null) => {
   return rows;
 };
 
+
 // Simulasi tolerant (hanya field utama)
 exports.getSimulatedMicro = async (simDateStr, toleranceSec = 300) => {
   const { rows } = await poolClimate.query(
