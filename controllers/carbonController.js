@@ -3,7 +3,7 @@ const carbonService = require('../services/carbonService');
 const cache = require('../cache');
 const { Parser } = require('json2csv');
 
-// Ambil 10 data terakhir
+// Ambil 10 data terakhir dengan toleransi 5 menit
 exports.getCO2Last10 = async (req, res) => {
   try {
     const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
@@ -14,7 +14,7 @@ exports.getCO2Last10 = async (req, res) => {
   }
 };
 
-// Simulasi tolerant
+// Simulasi tolerant dengan 5 menit toleransi
 exports.getRealtimeSimulatedCO2 = async (req, res) => {
   try {
     const nowWIB = moment.tz('Asia/Jakarta');
