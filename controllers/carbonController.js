@@ -18,10 +18,11 @@ exports.getCO2Last10 = async (req, res) => {
 exports.getRealtimeSimulatedCO2 = async (req, res) => {
   try {
     const nowWIB = moment.tz('Asia/Jakarta');
-    const simDateWIB = nowWIB.clone().month(3).year(2025); // Set tanggal April 2025
-    const simDateUTC = simDateWIB.clone().tz('UTC');
-    const simDateStr = simDateUTC.format('YYYY-MM-DD HH:mm:ss');
-    const rows = await carbonService.getSimulatedCO2(simDateStr);
+    const simDateWIB = nowWIB.clone().month(3).year(2025);
+    const simDateStr = simDateWIB.format('YYYY-MM-DD HH:mm:ss');
+    const toleranceSec = 300;
+
+    const rows = await carbonService.getSimulatedCO2(simDateStr, toleranceSec);
     if (!rows.length) return res.status(404).json({ error: 'No data found near simulated time' });
     res.json(rows[0]);
   } catch (e) {
