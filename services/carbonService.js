@@ -49,8 +49,6 @@ exports.getLast10CO2 = async (simDateStr = null) => {
   return rows;
 };
 
-
-// Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
 // Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
 exports.getSimulatedCO2 = async (simDateStr) => {
   const simTimestamp = new Date(simDateStr).getTime() / 1000;
@@ -61,14 +59,14 @@ exports.getSimulatedCO2 = async (simDateStr) => {
   const sql = `
     SELECT
       mode() WITHIN GROUP (ORDER BY co2) AS co2_mode,
-      MIN(timestamp) AS simulated_timestamp  // Ganti nama column agar tidak bentrok
+      MIN(timestamp) AS simulated_timestamp  -- Ganti nama column agar tidak bentrok
     FROM
       station2s
     WHERE
       timestamp >= $1
-      AND timestamp < ($1::timestamp + INTERVAL '1 minute')  // Window for 1 minute
+      AND timestamp < ($1::timestamp + INTERVAL '1 minute')  -- Window for 1 minute
     GROUP BY
-      simulated_timestamp  // Gunakan nama yang tidak bentrok
+      simulated_timestamp  -- Gunakan nama yang tidak bentrok
   `;
   const { rows } = await poolEddyKalimantan.query(sql, [windowStart]);
 
