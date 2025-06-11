@@ -51,6 +51,7 @@ exports.getLast10CO2 = async (simDateStr = null) => {
 
 
 // Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
+// Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
 exports.getSimulatedCO2 = async (simDateStr) => {
   const simTimestamp = new Date(simDateStr).getTime() / 1000;
   const windowStartSec = Math.floor(simTimestamp / 60) * 60;  // Truncating to minute
@@ -60,14 +61,14 @@ exports.getSimulatedCO2 = async (simDateStr) => {
   const sql = `
     SELECT
       mode() WITHIN GROUP (ORDER BY co2) AS co2_mode,
-      MIN(timestamp) as window_start
+      MIN(timestamp) AS simulated_timestamp  // Ganti nama column agar tidak bentrok
     FROM
       station2s
     WHERE
       timestamp >= $1
       AND timestamp < ($1::timestamp + INTERVAL '1 minute')  // Window for 1 minute
     GROUP BY
-      window_start
+      simulated_timestamp  // Gunakan nama yang tidak bentrok
   `;
   const { rows } = await poolEddyKalimantan.query(sql, [windowStart]);
 
@@ -77,13 +78,13 @@ exports.getSimulatedCO2 = async (simDateStr) => {
   const targetTimestamp = new Date(simDateStr).getTime();
   const tolerance = 5 * 60 * 1000; // 5 minutes tolerance in milliseconds
   const closestData = rows.filter(row => {
-    const rowTimestamp = new Date(row.window_start).getTime();
+    const rowTimestamp = new Date(row.simulated_timestamp).getTime();
     return Math.abs(rowTimestamp - targetTimestamp) <= tolerance;
   });
 
   if (closestData.length > 0) {
     return [{
-      window_start: closestData[0].window_start,
+      simulated_timestamp: closestData[0].simulated_timestamp,
       co2_mode: closestData[0].co2_mode
     }];
   }
