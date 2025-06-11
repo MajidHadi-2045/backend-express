@@ -8,8 +8,8 @@ exports.getLast10Micro = async (simDateStr = null) => {
   const targetDate = nowWIB.subtract(48, 'days');  // Mengurangi 48 hari dari tanggal sekarang
   const simDate = targetDate.format('YYYY-MM-DD HH:mm:ss');  // Menggunakan waktu lokal setelah pengurangan
   
-  const start = '2025-04-25 00:00:00';
-  const end   = '2025-05-07 23:59:59';
+  const start = '2025-04-01 00:00:00';
+  const end   = '2025-04-30 23:59:59';
 
   let timeFilter = '';
   let params = [start, end];
