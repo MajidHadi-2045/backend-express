@@ -5,12 +5,14 @@ const { Parser } = require('json2csv');
 // 10 data terakhir prediksi CO2
 exports.getPredictLast10 = async (req, res) => {
   try {
-    const rows = await carbonPredictService.getLast10Predict();
+    const { sim_time } = req.query;  // Jika ada parameter sim_time, akan digunakan untuk simulasi
+    const rows = await carbonPredictService.getLast10Predict(sim_time);  // Panggil service dengan simDateStr
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 };
+
 
 // Simulasi tolerant
 exports.getRealtimeSimulatedPredict = async (req, res) => {

@@ -4,10 +4,11 @@ const { poolEddyKalimantan } = require('../config/database');
 // 10 data terakhir CO2 bulan April 2025
 exports.getLast10CO2 = async (simDateStr = null) => {
   const start = '2025-04-01 00:00:00';
-  const end   = '2025-04-30 23:59:59';
-
+  const end = '2025-04-30 23:59:59';
+  
   let windowFilter = '';
   let params = [];
+  
   if (simDateStr) {
     const simTimestamp = new Date(simDateStr).getTime() / 1000;
     const windowStartSec = Math.floor(simTimestamp / 5) * 5;
@@ -15,6 +16,7 @@ exports.getLast10CO2 = async (simDateStr = null) => {
     windowFilter = "AND window_start <= $1";
     params.push(windowStart);
   }
+  
   params.push(start, end);
 
   let sql = `
@@ -35,10 +37,10 @@ exports.getLast10CO2 = async (simDateStr = null) => {
     ORDER BY window_start DESC
     LIMIT 10
   `;
+  
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
-
 
 // Ambil data simulasi tolerant (hanya timestamp, co2)
 exports.getSimulatedCO2 = async (simDateStr) => {

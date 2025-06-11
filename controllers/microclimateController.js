@@ -6,9 +6,8 @@ const { Parser } = require('json2csv');
 // 10 data terakhir
 exports.getMicroLast10 = async (req, res) => {
   try {
-    // Ambil waktu window simulasi dari query jika ingin benar-benar sinkron
-    const { sim_time } = req.query;
-    const rows = await microclimateService.getLast10Micro(sim_time);
+    const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
+    const rows = await microclimateService.getLast10Micro(sim_time);  // Panggil service dengan simDateStr
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -29,7 +28,6 @@ exports.getRealtimeSimulatedMicro = async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 };
-
 
 // Endpoint MQTT stream (realtime)
 exports.getMicroStream = (req, res) => {

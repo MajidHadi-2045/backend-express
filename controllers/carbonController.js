@@ -6,13 +6,14 @@ const { Parser } = require('json2csv');
 // Ambil 10 data terakhir
 exports.getCO2Last10 = async (req, res) => {
   try {
-    const { sim_time } = req.query; // optional, dari window_start /db/simulate
-    const rows = await carbonService.getLast10CO2(sim_time);
+    const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
+    const rows = await carbonService.getLast10CO2(sim_time);  // Panggil service dengan simDateStr
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 };
+
 
 // Simulasi tolerant
 exports.getRealtimeSimulatedCO2 = async (req, res) => {

@@ -16,17 +16,31 @@ exports.getLivePrediction = async () => {
 // };
 
 // 10 data terakhir prediksi CO2 bulan April 2025 =>co2_predicted_cp
-exports.getLast10Predict = async () => {
+// carbonPredictService.js - Modifikasi getLast10Predict
+exports.getLast10Predict = async (simDateStr = null) => {
   const start = '2025-04-01 00:00:00';
-  const end   = '2025-04-30 23:59:59';
+  const end = '2025-04-30 23:59:59';
+  
+  let timeFilter = '';
+  let params = [start, end];
+  
+  // Cek jika ada simDateStr yang diberikan
+  if (simDateStr) {
+    timeFilter = "AND timestamp <= $3";
+    params.push(simDateStr);
+  }
+
   const { rows } = await poolEddyKalimantan.query(
-    `SELECT timestamp, co2 AS co2_pred
-     FROM station2s 
-     WHERE timestamp >= $1 AND timestamp <= $2 
-     ORDER BY timestamp DESC 
-     LIMIT 10`,
-    [start, end]
+    `
+    SELECT timestamp, co2 AS co2_pred
+    FROM station2s
+    WHERE timestamp >= $1 AND timestamp <= $2 ${timeFilter}
+    ORDER BY timestamp DESC
+    LIMIT 10
+    `,
+    params
   );
+
   return rows;
 };
 
