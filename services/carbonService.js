@@ -1,7 +1,6 @@
 const { poolEddyKalimantan } = require('../config/database');
 
-// Ambil semua data histori CO2 (hanya timestamp, co2)
-// Ambil semua data histori CO2 (hanya timestamp, co2) dengan modus per menit
+// Ambil semua data histori CO2 (hanya timestamp, co2) dengan modus per menit dan toleransi 5 menit
 exports.getLast10CO2 = async (simDateStr = null) => {
   const start = '2025-04-01 00:00:00';
   const end   = '2025-04-30 23:59:59';
@@ -12,7 +11,12 @@ exports.getLast10CO2 = async (simDateStr = null) => {
     const simTimestamp = new Date(simDateStr).getTime() / 1000;
     const windowStartSec = Math.floor(simTimestamp / 60) * 60; // Truncating to minute
     const windowStart = new Date(windowStartSec * 1000).toISOString();
-    windowFilter = "AND window_start <= $1";
+    
+    // Adding 5 minutes tolerance: +/- 300 seconds (5 minutes)
+    windowFilter = `
+      AND (timestamp BETWEEN $1 AND ($1::timestamp + INTERVAL '5 minute') 
+           OR timestamp BETWEEN ($1::timestamp - INTERVAL '5 minute') AND $1)
+    `;
     params.push(windowStart);
   }
   params.push(start, end);
@@ -39,12 +43,13 @@ exports.getLast10CO2 = async (simDateStr = null) => {
   return rows;
 };
 
-// Ambil data simulasi tolerant (hanya timestamp, co2) per menit
+// Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
 exports.getSimulatedCO2 = async (simDateStr) => {
   const simTimestamp = new Date(simDateStr).getTime() / 1000;
   const windowStartSec = Math.floor(simTimestamp / 60) * 60;  // Truncating to minute
   const windowStart = new Date(windowStartSec * 1000).toISOString();
 
+  // Adding 5 minutes tolerance: +/- 300 seconds (5 minutes)
   const sql = `
     SELECT
       mode() WITHIN GROUP (ORDER BY co2) AS co2_mode,
@@ -52,8 +57,10 @@ exports.getSimulatedCO2 = async (simDateStr) => {
     FROM
       station2s
     WHERE
-      timestamp >= $1
-      AND timestamp < ($1::timestamp + INTERVAL '1 minute')  // Window for 1 minute
+      (timestamp BETWEEN $1 AND ($1::timestamp + INTERVAL '5 minute') 
+       OR timestamp BETWEEN ($1::timestamp - INTERVAL '5 minute') AND $1)
+    GROUP BY
+      window_start
   `;
   const { rows } = await poolEddyKalimantan.query(sql, [windowStart]);
   if (!rows.length || rows[0].co2_mode === null) return [];
