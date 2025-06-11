@@ -5,22 +5,16 @@ exports.getLast10CO2 = async (simDateStr = null) => {
   const start = '2025-04-01 00:00:00';
   const end   = '2025-04-30 23:59:59';
 
-  let windowFilter = '';
   let params = [];
   if (simDateStr) {
     const simTimestamp = new Date(simDateStr).getTime() / 1000;
     const windowStartSec = Math.floor(simTimestamp / 60) * 60; // Truncating to minute
     const windowStart = new Date(windowStartSec * 1000).toISOString();
-    
-    // Adding 5 minutes tolerance: +/- 300 seconds (5 minutes)
-    windowFilter = `
-      AND (timestamp BETWEEN $1 AND ($1::timestamp + INTERVAL '5 minute') 
-           OR timestamp BETWEEN ($1::timestamp - INTERVAL '5 minute') AND $1)
-    `;
     params.push(windowStart);
   }
-  params.push(start, end);
 
+  // Fetch the data within the desired timeframe without applying tolerance in SQL
+  params.push(start, end);
   let sql = `
     WITH sampled AS (
       SELECT
@@ -35,13 +29,26 @@ exports.getLast10CO2 = async (simDateStr = null) => {
     )
     SELECT *
     FROM sampled
-    WHERE 1=1 ${windowFilter}
     ORDER BY window_start DESC
     LIMIT 10
   `;
   const { rows } = await poolEddyKalimantan.query(sql, params);
+
+  if (simDateStr) {
+    // Filter the data to apply 5-minute tolerance
+    const targetTimestamp = new Date(simDateStr).getTime();
+    const tolerance = 5 * 60 * 1000; // 5 minutes tolerance in milliseconds
+
+    // Find the closest data points within the 5-minute range
+    return rows.filter(row => {
+      const rowTimestamp = new Date(row.window_start).getTime();
+      return Math.abs(rowTimestamp - targetTimestamp) <= tolerance;
+    });
+  }
+
   return rows;
 };
+
 
 // Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
 exports.getSimulatedCO2 = async (simDateStr) => {
@@ -49,7 +56,7 @@ exports.getSimulatedCO2 = async (simDateStr) => {
   const windowStartSec = Math.floor(simTimestamp / 60) * 60;  // Truncating to minute
   const windowStart = new Date(windowStartSec * 1000).toISOString();
 
-  // Adding 5 minutes tolerance: +/- 300 seconds (5 minutes)
+  // Fetch the data for the specified time window
   const sql = `
     SELECT
       mode() WITHIN GROUP (ORDER BY co2) AS co2_mode,
@@ -57,17 +64,31 @@ exports.getSimulatedCO2 = async (simDateStr) => {
     FROM
       station2s
     WHERE
-      (timestamp BETWEEN $1 AND ($1::timestamp + INTERVAL '5 minute') 
-       OR timestamp BETWEEN ($1::timestamp - INTERVAL '5 minute') AND $1)
+      timestamp >= $1
+      AND timestamp < ($1::timestamp + INTERVAL '1 minute')  // Window for 1 minute
     GROUP BY
       window_start
   `;
   const { rows } = await poolEddyKalimantan.query(sql, [windowStart]);
+
   if (!rows.length || rows[0].co2_mode === null) return [];
-  return [{
-    window_start: windowStart,
-    co2_mode: rows[0].co2_mode
-  }];
+
+  // Apply tolerance of 5 minutes manually
+  const targetTimestamp = new Date(simDateStr).getTime();
+  const tolerance = 5 * 60 * 1000; // 5 minutes tolerance in milliseconds
+  const closestData = rows.filter(row => {
+    const rowTimestamp = new Date(row.window_start).getTime();
+    return Math.abs(rowTimestamp - targetTimestamp) <= tolerance;
+  });
+
+  if (closestData.length > 0) {
+    return [{
+      window_start: closestData[0].window_start,
+      co2_mode: closestData[0].co2_mode
+    }];
+  }
+
+  return [];
 };
 
 // Dowload data
