@@ -50,44 +50,31 @@ exports.getLast10CO2 = async (simDateStr = null) => {
 };
 
 // Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
-exports.getSimulatedCO2 = async (simDateStr) => {
-  const simTimestamp = new Date(simDateStr).getTime() / 1000;
-  const windowStartSec = Math.floor(simTimestamp / 60) * 60;  // Truncating to minute
-  const windowStart = new Date(windowStartSec * 1000).toISOString();
+exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
+  const { rows } = await poolEddyKalimantan.query(
+    `
+    SELECT timestamp, co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
+    FROM microclimate_kalimantan
+    WHERE 
+      timestamp >= '2025-04-01 00:00:00'
+      AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2
+    ORDER BY diff_s ASC
+    LIMIT 1
+    `,
+    [simDateStr, toleranceSec]
+  );
+  // Hilangkan diff_s sebelum return
+  return rows.map(({ timestamp, co2 }) => ({
+    timestamp, co2
+  }));
+};
 
-  // Fetch the data for the specified time window
-  const sql = `
-    SELECT
-      mode() WITHIN GROUP (ORDER BY co2) AS co2_mode,
-      MIN(timestamp) AS simulated_timestamp  -- Ganti nama column agar tidak bentrok
-    FROM
-      station2s
-    WHERE
-      timestamp >= $1
-      AND timestamp < ($1::timestamp + INTERVAL '1 minute')  -- Window for 1 minute
-    GROUP BY
-      simulated_timestamp  -- Gunakan nama yang tidak bentrok
-  `;
-  const { rows } = await poolEddyKalimantan.query(sql, [windowStart]);
-
-  if (!rows.length || rows[0].co2_mode === null) return [];
-
-  // Apply tolerance of 5 minutes manually
-  const targetTimestamp = new Date(simDateStr).getTime();
-  const tolerance = 5 * 60 * 1000; // 5 minutes tolerance in milliseconds
-  const closestData = rows.filter(row => {
-    const rowTimestamp = new Date(row.simulated_timestamp).getTime();
-    return Math.abs(rowTimestamp - targetTimestamp) <= tolerance;
-  });
-
-  if (closestData.length > 0) {
-    return [{
-      simulated_timestamp: closestData[0].simulated_timestamp,
-      co2_mode: closestData[0].co2_mode
-    }];
-  }
-
-  return [];
+exports.insertMicro = async (timestamp, temperature, humidity, rainfall, pyrano) => {
+  await poolClimate.query(
+    `INSERT INTO climate (timestamp, temperature, humidity, rainfall, pyrano)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [timestamp, temperature, humidity, rainfall, pyrano]
+  );
 };
 
 // Dowload data
