@@ -17,15 +17,16 @@ exports.getCO2Last10 = async (req, res) => {
 // Simulasi tolerant dengan 5 menit toleransi
 exports.getRealtimeSimulatedCO2 = async (req, res) => {
   try {
-    const nowWIB = moment.tz('Asia/Jakarta');
-    const simDateWIB = nowWIB.clone().month(3).year(2025);
-    const simDateStr = simDateWIB.format('YYYY-MM-DD HH:mm:ss');
-    const toleranceSec = 300;
-
-    const rows = await carbonService.getSimulatedCO2(simDateStr, toleranceSec);
+    // Memanggil service untuk mendapatkan data simulasi CO2
+    const rows = await carbonService.getSimulatedCO2();
+    
+    // Jika tidak ada data yang ditemukan
     if (!rows.length) return res.status(404).json({ error: 'No data found near simulated time' });
+    
+    // Mengirimkan data yang ditemukan ke klien
     res.json(rows[0]);
   } catch (e) {
+    // Menangani error jika terjadi
     res.status(500).json({ error: e.message });
   }
 };
