@@ -5,11 +5,11 @@ const { poolEddyKalimantan } = require('../config/database');
 exports.getLast10CO2 = async (simDateStr = null) => {
   const nowWIB = moment.tz('Asia/Jakarta');  // Waktu sekarang di zona Jakarta
 
-  // Menyesuaikan tanggal sekarang dengan menggeser 13 hari
-  const startDate = nowWIB.clone().subtract(13, 'days').set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
-  const endDate = nowWIB.clone().subtract(13, 'days').set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
+  // Menggunakan bulan April dan Mei 2025
+  const startDate = nowWIB.clone().year(2025).month(3).date(25).set({ hour: 0, minute: 0, second: 0, millisecond: 0 }); // 25 April 2025
+  const endDate = nowWIB.clone().year(2025).month(4).date(7).set({ hour: 23, minute: 59, second: 59, millisecond: 999 }); // 7 Mei 2025
 
-  // Format tanggal yang sudah disesuaikan (mulai dari 25 April 2025)
+  // Format tanggal yang sudah disesuaikan
   const startFormatted = startDate.format('YYYY-MM-DD HH:mm:ss');
   const endFormatted = endDate.format('YYYY-MM-DD HH:mm:ss');
 
