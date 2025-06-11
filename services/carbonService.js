@@ -1,7 +1,7 @@
 const { poolEddyKalimantan } = require('../config/database');
 
 // Ambil semua data histori CO2 (hanya timestamp, co2)
-// 10 data terakhir CO2 bulan April 2025
+// Ambil semua data histori CO2 (hanya timestamp, co2) dengan modus per menit
 exports.getLast10CO2 = async (simDateStr = null) => {
   const start = '2025-04-01 00:00:00';
   const end   = '2025-04-30 23:59:59';
@@ -10,7 +10,7 @@ exports.getLast10CO2 = async (simDateStr = null) => {
   let params = [];
   if (simDateStr) {
     const simTimestamp = new Date(simDateStr).getTime() / 1000;
-    const windowStartSec = Math.floor(simTimestamp / 5) * 5;
+    const windowStartSec = Math.floor(simTimestamp / 60) * 60; // Truncating to minute
     const windowStart = new Date(windowStartSec * 1000).toISOString();
     windowFilter = "AND window_start <= $1";
     params.push(windowStart);
@@ -20,7 +20,7 @@ exports.getLast10CO2 = async (simDateStr = null) => {
   let sql = `
     WITH sampled AS (
       SELECT
-        date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
+        date_trunc('minute', timestamp) AS window_start,  // Truncate to minute
         mode() WITHIN GROUP (ORDER BY co2) AS co2_mode
       FROM
         station2s
@@ -39,11 +39,10 @@ exports.getLast10CO2 = async (simDateStr = null) => {
   return rows;
 };
 
-
-// Ambil data simulasi tolerant (hanya timestamp, co2)
+// Ambil data simulasi tolerant (hanya timestamp, co2) per menit
 exports.getSimulatedCO2 = async (simDateStr) => {
   const simTimestamp = new Date(simDateStr).getTime() / 1000;
-  const windowStartSec = Math.floor(simTimestamp / 5) * 5;
+  const windowStartSec = Math.floor(simTimestamp / 60) * 60;  // Truncating to minute
   const windowStart = new Date(windowStartSec * 1000).toISOString();
 
   const sql = `
@@ -54,7 +53,7 @@ exports.getSimulatedCO2 = async (simDateStr) => {
       station2s
     WHERE
       timestamp >= $1
-      AND timestamp < ($1::timestamp + INTERVAL '5 second')
+      AND timestamp < ($1::timestamp + INTERVAL '1 minute')  // Window for 1 minute
   `;
   const { rows } = await poolEddyKalimantan.query(sql, [windowStart]);
   if (!rows.length || rows[0].co2_mode === null) return [];
