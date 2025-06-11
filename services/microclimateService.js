@@ -55,14 +55,6 @@ exports.getSimulatedMicro = async (simDateStr, toleranceSec = 300) => {
   }));
 };
 
-exports.insertMicro = async (timestamp, temperature, humidity, rainfall, pyrano) => {
-  await poolClimate.query(
-    `INSERT INTO climate (timestamp, temperature, humidity, rainfall, pyrano)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [timestamp, temperature, humidity, rainfall, pyrano]
-  );
-};
-
 // Dowload data
 exports.downloadMicro = async (year, month, day, hour, minute, limit = 1000) => {
   let sql = `SELECT timestamp, rainfall, temperature, pyrano, humidity FROM microclimate_kalimantan WHERE 1=1`;
