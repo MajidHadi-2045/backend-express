@@ -1,4 +1,3 @@
-const moment = require('moment-timezone');
 const carbonService = require('../services/carbonService');
 const cache = require('../cache');
 const { Parser } = require('json2csv');
