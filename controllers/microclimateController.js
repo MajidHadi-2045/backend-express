@@ -3,7 +3,7 @@ const microclimateService = require('../services/microclimateService');
 const cache = require('../cache');
 const { Parser } = require('json2csv');
 
-// 10 data terakhir
+// 10 data terakhir berdasarkan waktu sekarang
 exports.getMicroLast10 = async (req, res) => {
   try {
     const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
