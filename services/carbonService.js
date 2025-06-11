@@ -1,10 +1,27 @@
 const moment = require('moment');  // Mengimpor moment tanpa timezone
 const { poolEddyKalimantan } = require('../config/database');
 
-// Ambil data berdasarkan perhitungan tanggal sekarang dengan waktu lokal (tanpa timezone)
-exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
-  console.log("Getting simulated CO2 data for:", simDateStr);  // Debug: Log simulated date
+// Fungsi untuk mendapatkan 10 data terakhir CO2
+exports.getLast10CO2 = async (simDateStr) => {
+  // Menggunakan simDateStr untuk melakukan query berdasarkan waktu yang telah disesuaikan
+  let sql = `
+    SELECT timestamp, co2
+    FROM co2_backend
+    WHERE timestamp <= $1
+    ORDER BY timestamp DESC
+    LIMIT 10
+  `;
   
+  const { rows } = await poolEddyKalimantan.query(sql, [simDateStr]);
+  
+  return {
+    data: rows,
+    simulatedDate: simDateStr // Mengembalikan tanggal simulasi yang diambil
+  };
+};
+
+// Fungsi untuk mendapatkan data CO2 berdasarkan waktu simulasi
+exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
   const { rows } = await poolEddyKalimantan.query(
     `
     SELECT timestamp, co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
@@ -17,20 +34,13 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
     `,
     [simDateStr, toleranceSec]
   );
-
-  console.log("Rows returned from query:", rows);  // Debug: Log returned rows
-  
-  // Hilangkan diff_s sebelum return
   return rows.map(({ timestamp, co2 }) => ({
     timestamp, co2
   }));
 };
 
-// Dowload data
+// Fungsi untuk download data CO2 tanpa pengurangan 48 hari
 exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000, simDateStr) => {
-  // Debug log untuk parameter
-  console.log(`Download CO2 data with parameters: year=${year}, month=${month}, day=${day}, hour=${hour}, minute=${minute}, limit=${limit}, simulatedDate=${simDateStr}`);
-
   let conditions = [];
   let params = [];
   let sqlWhere = "";
@@ -59,12 +69,11 @@ exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000, simDa
   `;
   params.push(limit);
 
-  console.log("SQL Query:", sql);  // Debug: Log SQL query
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
 
-// Download by range date
+// Fungsi untuk download data CO2 dalam rentang tanggal tanpa pengurangan 48 hari
 exports.downloadCO2ByRange = async (start_date, end_date, simDateStr) => {
   let sql = `
     SELECT
@@ -80,7 +89,6 @@ exports.downloadCO2ByRange = async (start_date, end_date, simDateStr) => {
       window_start ASC
   `;
   const params = [start_date, end_date];
-  console.log("SQL Query:", sql);  // Debug: Log SQL query
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
