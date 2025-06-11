@@ -1,27 +1,28 @@
+const moment = require('moment-timezone');  // Mengimpor moment dengan timezone
 const { poolEddyKalimantan } = require('../config/database');
 
 // Ambil semua data histori CO2 (hanya timestamp, co2) dengan modus per menit dan toleransi 5 menit
 exports.getLast10CO2 = async (simDateStr = null) => {
-  const start = '2025-04-01 00:00:00';
-  const end   = '2025-04-30 23:59:59';
+  const nowWIB = moment.tz('Asia/Jakarta');  // Waktu sekarang di zona Jakarta
 
-  let params = [];
-  if (simDateStr) {
-    const simTimestamp = new Date(simDateStr).getTime() / 1000;
-    const windowStartSec = Math.floor(simTimestamp / 60) * 60; // Truncating to minute
-    const windowStart = new Date(windowStartSec * 1000).toISOString();
-    params.push(windowStart);
-  }
+  // Menyesuaikan tanggal sekarang dengan menggeser 13 hari
+  const startDate = nowWIB.clone().subtract(13, 'days').set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+  const endDate = nowWIB.clone().subtract(13, 'days').set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
 
-  // Fetch the data within the desired timeframe without applying tolerance in SQL
-  params.push(start, end);
+  // Format tanggal yang sudah disesuaikan
+  const startFormatted = startDate.format('YYYY-MM-DD HH:mm:ss');
+  const endFormatted = endDate.format('YYYY-MM-DD HH:mm:ss');
+
+  let params = [startFormatted, endFormatted];
+
+  // Query untuk mengambil data berdasarkan waktu yang disesuaikan
   let sql = `
     WITH sampled AS (
       SELECT
         date_trunc('minute', timestamp) AS window_start,  // Truncate to minute
         mode() WITHIN GROUP (ORDER BY co2) AS co2_mode
       FROM
-        station2s
+        co2_backend
       WHERE
         timestamp >= $${params.length - 1} AND timestamp <= $${params.length}
       GROUP BY
@@ -49,32 +50,24 @@ exports.getLast10CO2 = async (simDateStr = null) => {
   return rows;
 };
 
-// Ambil data simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
-exports.getSimulatedCO2 = async () => {
-  // Mengambil waktu saat ini dalam zona waktu Jakarta
-  const nowWIB = moment.tz('Asia/Jakarta');
-  
-  // Menentukan waktu dengan bulan dan tahun April 2025 tetapi jam, menit, detik mengikuti waktu saat ini
-  const simDateStr = nowWIB.clone().month(3).year(2025).format('YYYY-MM-DD HH:mm:ss');  // April 2025
-  
-  const toleranceSec = 300;  // Toleransi 5 menit = 300 detik
-
-  // Query untuk mendapatkan data dengan toleransi waktu 300 detik dari timestamp yang dihitung
+// Simulasi tolerant (hanya timestamp, co2) per menit dengan toleransi 5 menit
+exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
   const { rows } = await poolEddyKalimantan.query(
     `
-    SELECT timestamp, co2, 
-           ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
-    FROM station2s
-    WHERE timestamp >= '2025-04-01 00:00:00'  -- Rentang waktu mulai April 2025
-      AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2  -- Toleransi waktu (300 detik)
-    ORDER BY diff_s ASC  -- Urutkan berdasarkan kedekatan waktu
-    LIMIT 1;  -- Ambil data yang paling dekat dengan waktu saat ini
+    SELECT timestamp, co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
+    FROM co2_backend
+    WHERE 
+      timestamp >= '2025-04-01 00:00:00'
+      AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2
+    ORDER BY diff_s ASC
+    LIMIT 1
     `,
-    [simDateStr, toleranceSec]  // Parameter: simDateStr (timestamp dengan bulan April 2025) dan toleranceSec (toleransi waktu)
+    [simDateStr, toleranceSec]
   );
-  
-  // Mengembalikan data yang ditemukan
-  return rows;
+  // Hilangkan diff_s sebelum return
+  return rows.map(({ timestamp, co2 }) => ({
+    timestamp, co2
+  }));
 };
 
 // Dowload data
@@ -99,7 +92,7 @@ exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000) => {
       date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
       mode() WITHIN GROUP (ORDER BY co2) AS co2_mode
     FROM
-      station2s
+      co2_backend
     ${sqlWhere}
     GROUP BY
       window_start
@@ -113,14 +106,14 @@ exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000) => {
   return rows;
 };
 
-// downlad by range date
+// Download by range date
 exports.downloadCO2ByRange = async (start_date, end_date) => {
   let sql = `
     SELECT
       date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
       mode() WITHIN GROUP (ORDER BY co2) AS co2_mode
     FROM
-      station2s
+      co2_backend
     WHERE
       timestamp >= $1 AND timestamp <= $2
     GROUP BY
