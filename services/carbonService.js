@@ -56,8 +56,8 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
     SELECT timestamp, co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
     FROM station2s
     WHERE 
-      timestamp >= '2025-04-01 00:00:00'
-      AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2
+      timestamp >= '2025-04-01 00:00:00'  -- Rentang waktu mulai
+      AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2  -- Toleransi waktu (dalam detik)
     ORDER BY diff_s ASC
     LIMIT 1
     `,
@@ -68,14 +68,6 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
   return rows.map(({ timestamp, co2 }) => ({
     timestamp, co2
   }));
-};
-
-exports.insertMicro = async (timestamp, temperature, humidity, rainfall, pyrano) => {
-  await poolClimate.query(
-    `INSERT INTO climate (timestamp, temperature, humidity, rainfall, pyrano)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [timestamp, temperature, humidity, rainfall, pyrano]
-  );
 };
 
 // Dowload data
