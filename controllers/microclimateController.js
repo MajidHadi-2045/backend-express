@@ -3,14 +3,16 @@ const microclimateService = require('../services/microclimateService');
 const cache = require('../cache');
 const { Parser } = require('json2csv');
 
+const moment = require('moment-timezone');
+const microclimateService = require('../services/microclimateService');
+
 // 10 data terakhir berdasarkan waktu sekarang
 exports.getMicroLast10 = async (req, res) => {
   try {
     const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
     const rows = await microclimateService.getLast10Micro(sim_time);  // Panggil service dengan simDateStr
     res.json({
-      data: rows,
-      simulatedDate: rows.length ? rows[0].timestamp : null  // Mengembalikan tanggal dan waktu simulasi yang diambil
+      data: rows  // Mengembalikan hanya data yang diambil tanpa simulatedDate
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -28,8 +30,7 @@ exports.getRealtimeSimulatedMicro = async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'No data found near simulated time' });
 
     res.json({
-      data: rows[0],
-      simulatedDate: simDateStr  // Menambahkan tanggal simulasi pada respons
+      data: rows[0]  // Mengembalikan hanya data simulasi tanpa simulatedDate
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
