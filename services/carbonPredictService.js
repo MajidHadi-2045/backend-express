@@ -24,7 +24,7 @@ exports.getLast10CO2 = async (simDateStr = null) => {
 
   // Query untuk mengambil data dari tabel co2_predicted_cp berdasarkan waktu yang disesuaikan
   let sql = `
-    SELECT timestamp, co2_pred
+    SELECT timestamp, predicted_co2
     FROM co2_predicted_cp
     WHERE timestamp >= $1 AND timestamp <= $2
     ORDER BY timestamp DESC
@@ -33,9 +33,9 @@ exports.getLast10CO2 = async (simDateStr = null) => {
 
   const { rows } = await poolEddyKalimantan.query(sql, params);
 
-  return rows.map(({ timestamp, co2_pred }) => ({
+  return rows.map(({ timestamp, predicted_co2 }) => ({
     timestamp,
-    co2: co2_pred  // Mengganti co2 dengan co2_pred
+    co2: predicted_co2  // Mengganti co2 dengan predicted_co2
   }));
 };
 
@@ -56,7 +56,7 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
   // Query untuk mendapatkan data CO2 dari tabel co2_predicted_cp berdasarkan waktu simulasi
   const { rows } = await poolEddyKalimantan.query(
     `
-    SELECT timestamp, co2_pred, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
+    SELECT timestamp, predicted_co2, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
     FROM co2_predicted_cp
     WHERE 
       timestamp >= '2025-04-01 00:00:00'
@@ -66,8 +66,8 @@ exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
     `,
     [startFormatted, toleranceSec]
   );
-  return rows.map(({ timestamp, co2_pred }) => ({
-    timestamp, co2: co2_pred  // Mengganti co2 dengan co2_pred
+  return rows.map(({ timestamp, predicted_co2 }) => ({
+    timestamp, co2: predicted_co2  // Mengganti co2 dengan predicted_co2
   }));
 };
 
@@ -89,7 +89,7 @@ exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000, simDa
   let sql = `
     SELECT
       date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
-      mode() WITHIN GROUP (ORDER BY co2_pred) AS co2_mode
+      mode() WITHIN GROUP (ORDER BY predicted_co2) AS co2_mode
     FROM
       co2_predicted_cp
     ${sqlWhere}
@@ -110,7 +110,7 @@ exports.downloadCO2ByRange = async (start_date, end_date, simDateStr) => {
   let sql = `
     SELECT
       date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
-      mode() WITHIN GROUP (ORDER BY co2_pred) AS co2_mode
+      mode() WITHIN GROUP (ORDER BY predicted_co2) AS co2_mode
     FROM
       co2_predicted_cp
     WHERE
