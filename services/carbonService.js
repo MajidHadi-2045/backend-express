@@ -3,7 +3,6 @@ const { poolEddyKalimantan } = require('../config/database');
 
 // Fungsi untuk mendapatkan 10 data terakhir CO2
 exports.getLast10CO2 = async (simDateStr) => {
-  // Menggunakan simDateStr untuk melakukan query berdasarkan waktu yang telah disesuaikan
   let sql = `
     SELECT timestamp, co2
     FROM co2_backend
@@ -13,11 +12,12 @@ exports.getLast10CO2 = async (simDateStr) => {
   `;
   
   const { rows } = await poolEddyKalimantan.query(sql, [simDateStr]);
-  
-  return {
-    data: rows,
-    simulatedDate: simDateStr // Mengembalikan tanggal simulasi yang diambil
-  };
+
+  // Mengembalikan data langsung tanpa menambahkan "data"
+  return rows.map(({ timestamp, co2 }) => ({
+    timestamp,
+    co2
+  }));
 };
 
 // Fungsi untuk mendapatkan data CO2 berdasarkan waktu simulasi
