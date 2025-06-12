@@ -3,7 +3,7 @@ const router = express.Router();
 const ctl = require('../controllers/carbonPredictController');
 
 // Simulasi tolerant
-router.get('/db/simulate', ctl.getRealtimeSimulatedPredict);
+router.get('/db/simulate', ctl.getSimulatedCO2);
 
 // 10 data terakhir prediksi CO2
 router.get('/db', ctl.getPredictLast10);
