@@ -1,99 +1,126 @@
 const axios = require('axios');
 const { poolEddyKalimantan } = require('../config/database');
+const moment = require('moment-timezone');
 
-// Live prediction dari backend Python (jika masih dipakai)
-exports.getLivePrediction = async () => {
-  // Panggil backend python dengan source=db
-  const pythonApi = process.env.PYTHON_API_URL + '?source=db';
-  const res = await axios.get(pythonApi);
-  return res.data;
-};
-// exports.getLivePrediction = async () => {
-//   // Panggil backend python dengan source=mqtt
-//   const pythonApi = process.env.PYTHON_API_URL + '?source=mqtt';
-//   const res = await axios.get(pythonApi);
-//   return res.data;
-// };
+// 10 data terakhir prediksi CO2 dari tabel co2_predicted_cp
+exports.getLast10CO2 = async (simDateStr = null) => {
+  const nowWIB = moment.tz('Asia/Jakarta');  // Waktu sekarang di zona Jakarta (WIB)
 
-// 10 data terakhir prediksi CO2 bulan April 2025 =>co2_predicted_cp
-// carbonPredictService.js - Modifikasi getLast10Predict
-exports.getLast10Predict = async (simDateStr = null) => {
-  const start = '2025-04-01 00:00:00';
-  const end = '2025-04-30 23:59:59';
-  
-  let timeFilter = '';
-  let params = [start, end];
-  
-  // Cek jika ada simDateStr yang diberikan
-  if (simDateStr) {
-    timeFilter = "AND timestamp <= $3";
-    params.push(simDateStr);
-  }
+  // Menghitung perbedaan hari antara tanggal sekarang dan 48 hari yang lalu
+  const referenceDate = moment('2025-04-25');  // Tanggal referensi (25 April 2025)
+  const daysDifference = nowWIB.diff(referenceDate, 'days') - 48;  // Mengurangi 48 hari dari perhitungan
 
-  const { rows } = await poolEddyKalimantan.query(
-    `
-    SELECT timestamp, co2 AS co2_pred
-    FROM station2s
-    WHERE timestamp >= $1 AND timestamp <= $2 ${timeFilter}
+  // Sesuaikan tanggal yang diambil berdasarkan perbedaan hari yang sudah dikurangi
+  const simulatedDate = referenceDate.clone().add(daysDifference, 'days');  // Sesuaikan tanggal simulasi
+  simulatedDate.set({ hour: nowWIB.hour(), minute: nowWIB.minute(), second: nowWIB.second(), millisecond: nowWIB.millisecond() });
+
+  const startFormatted = simulatedDate.format('YYYY-MM-DD HH:mm:ss');
+
+  // Tentukan tanggal akhir, yaitu 7 Mei 2025
+  const endDate = moment('2025-05-07').set({ hour: nowWIB.hour(), minute: nowWIB.minute(), second: nowWIB.second(), millisecond: nowWIB.millisecond() });
+  const endFormatted = endDate.format('YYYY-MM-DD HH:mm:ss');
+
+  let params = [startFormatted, endFormatted];
+
+  // Query untuk mengambil data dari tabel co2_predicted_cp berdasarkan waktu yang disesuaikan
+  let sql = `
+    SELECT timestamp, co2_pred
+    FROM co2_predicted_cp
+    WHERE timestamp >= $1 AND timestamp <= $2
     ORDER BY timestamp DESC
     LIMIT 10
-    `,
-    params
-  );
+  `;
 
-  return rows;
+  const { rows } = await poolEddyKalimantan.query(sql, params);
+
+  return rows.map(({ timestamp, co2_pred }) => ({
+    timestamp,
+    co2: co2_pred  // Mengganti co2 dengan co2_pred
+  }));
 };
 
-// Simulasi tolerant (hanya kolom penting)
-exports.getSimulatedPredict = async (simDateStr, toleranceSec = 300) => {
+// Fungsi untuk mendapatkan data CO2 berdasarkan waktu simulasi dengan pengurangan 48 hari
+exports.getSimulatedCO2 = async (simDateStr, toleranceSec = 300) => {
+  const nowWIB = moment.tz('Asia/Jakarta');  // Waktu sekarang di zona Jakarta (WIB)
+
+  // Menghitung perbedaan hari antara tanggal sekarang dan 48 hari yang lalu
+  const referenceDate = moment('2025-04-25');  // Tanggal referensi (25 April 2025)
+  const daysDifference = nowWIB.diff(referenceDate, 'days') - 48;  // Mengurangi 48 hari dari perhitungan
+
+  // Sesuaikan tanggal yang diambil berdasarkan perbedaan hari yang sudah dikurangi
+  const simulatedDate = referenceDate.clone().add(daysDifference, 'days');  // Sesuaikan tanggal simulasi
+  simulatedDate.set({ hour: nowWIB.hour(), minute: nowWIB.minute(), second: nowWIB.second(), millisecond: nowWIB.millisecond() });
+
+  const startFormatted = simulatedDate.format('YYYY-MM-DD HH:mm:ss');
+
+  // Query untuk mendapatkan data CO2 dari tabel co2_predicted_cp berdasarkan waktu simulasi
   const { rows } = await poolEddyKalimantan.query(
     `
-    SELECT timestamp, co2 AS co2_pred, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
-    FROM station2s
+    SELECT timestamp, co2_pred, ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) AS diff_s
+    FROM co2_predicted_cp
     WHERE 
       timestamp >= '2025-04-01 00:00:00'
       AND ABS(EXTRACT(EPOCH FROM (timestamp - $1::timestamp))) <= $2
     ORDER BY diff_s ASC
     LIMIT 1
     `,
-    [simDateStr, toleranceSec]
+    [startFormatted, toleranceSec]
   );
-  // Hilangkan diff_s sebelum return //co2 AS co2_pred
-  return rows.map(({ timestamp, co2_pred }) => ({ timestamp, co2_pred }));
+  return rows.map(({ timestamp, co2_pred }) => ({
+    timestamp, co2: co2_pred  // Mengganti co2 dengan co2_pred
+  }));
 };
 
-// dowload data //tabel asli =>co2_predicted_cp 
-exports.downloadPredict = async (year, month, day, hour, minute, limit = 1000) => {
-  let sql = `SELECT timestamp, co2 AS co2_pred FROM station2s WHERE 1=1`;
-  const params = [];
-  if (year) { sql += ` AND EXTRACT(YEAR FROM timestamp) = $${params.length + 1}`; params.push(year); }
-  if (month) { sql += ` AND EXTRACT(MONTH FROM timestamp) = $${params.length + 1}`; params.push(month); }
-  if (day) { sql += ` AND EXTRACT(DAY FROM timestamp) = $${params.length + 1}`; params.push(day); }
-  if (hour) { sql += ` AND EXTRACT(HOUR FROM timestamp) = $${params.length + 1}`; params.push(hour); }
-  if (minute) { sql += ` AND EXTRACT(MINUTE FROM timestamp) = $${params.length + 1}`; params.push(minute); }
-  sql += ` ORDER BY timestamp ASC LIMIT $${params.length + 1}`;
+// Fungsi untuk download data CO2 tanpa pengurangan 48 hari
+exports.downloadCO2 = async (year, month, day, hour, minute, limit = 1000, simDateStr) => {
+  let conditions = [];
+  let params = [];
+  let sqlWhere = "";
+
+  if (year)   { conditions.push(`EXTRACT(YEAR FROM timestamp) = $${params.length + 1}`); params.push(year); }
+  if (month)  { conditions.push(`EXTRACT(MONTH FROM timestamp) = $${params.length + 1}`); params.push(month); }
+  if (day)    { conditions.push(`EXTRACT(DAY FROM timestamp) = $${params.length + 1}`); params.push(day); }
+  if (hour)   { conditions.push(`EXTRACT(HOUR FROM timestamp) = $${params.length + 1}`); params.push(hour); }
+  if (minute) { conditions.push(`EXTRACT(MINUTE FROM timestamp) = $${params.length + 1}`); params.push(minute); }
+  if (conditions.length > 0) {
+    sqlWhere = "WHERE " + conditions.join(" AND ");
+  }
+
+  let sql = `
+    SELECT
+      date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
+      mode() WITHIN GROUP (ORDER BY co2_pred) AS co2_mode
+    FROM
+      co2_predicted_cp
+    ${sqlWhere}
+    GROUP BY
+      window_start
+    ORDER BY
+      window_start ASC
+    LIMIT $${params.length + 1}
+  `;
   params.push(limit);
+
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
 
-// downlad by range date
-exports.downloadPredictByRange = async (start_date, end_date, limit) => {
-  let sql = `SELECT timestamp, co2 AS co2_pred FROM station2s WHERE 1=1`;
-  const params = [];
-  if (start_date) {
-    sql += ` AND timestamp >= $${params.length + 1}`;
-    params.push(start_date);
-  }
-  if (end_date) {
-    sql += ` AND timestamp <= $${params.length + 1}`;
-    params.push(end_date);
-  }
-  sql += ` ORDER BY timestamp ASC`;
-  if (limit) {
-    sql += ` LIMIT $${params.length + 1}`;
-    params.push(limit);
-  }
+// Fungsi untuk download data CO2 dalam rentang tanggal tanpa pengurangan 48 hari
+exports.downloadCO2ByRange = async (start_date, end_date, simDateStr) => {
+  let sql = `
+    SELECT
+      date_trunc('second', timestamp) + INTERVAL '1 second' * (FLOOR(EXTRACT(EPOCH FROM timestamp)::int / 5) * 5) AS window_start,
+      mode() WITHIN GROUP (ORDER BY co2_pred) AS co2_mode
+    FROM
+      co2_predicted_cp
+    WHERE
+      timestamp >= $1 AND timestamp <= $2
+    GROUP BY
+      window_start
+    ORDER BY
+      window_start ASC
+  `;
+  const params = [start_date, end_date];
   const { rows } = await poolEddyKalimantan.query(sql, params);
   return rows;
 };
