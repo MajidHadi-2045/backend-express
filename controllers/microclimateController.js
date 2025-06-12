@@ -11,8 +11,14 @@ exports.getMicroLast10 = async (req, res) => {
     const simDateStr = targetDate.format('YYYY-MM-DD HH:mm:ss');  // Menggunakan waktu lokal saat ini setelah pengurangan
 
     const rows = await microclimateService.getLast10Micro(simDateStr);  // Panggil service dengan simDateStr
+    
+    // Jika tidak ada data, kirim response kosong
+    if (rows.length === 0) {
+      return res.json({});  // Mengembalikan objek kosong jika tidak ada data
+    }
+
     res.json({
-      data: rows  // Mengembalikan data yang diambil tanpa simulatedDate
+      data: rows  // Mengembalikan data yang ditemukan
     });
   } catch (e) {
     console.error("Error in getMicroLast10:", e.message);  // Debug: Log error
@@ -29,11 +35,13 @@ exports.getRealtimeSimulatedMicro = async (req, res) => {
 
     const toleranceSec = 300;  // Toleransi 5 menit
     const rows = await microclimateService.getSimulatedMicro(simDateStr, toleranceSec);
-    if (!rows.length) {
-      return res.status(404).json({ error: 'No data found near simulated time' });
+
+    // Jika tidak ada data, kirim response kosong
+    if (rows.length === 0) {
+      return res.json({});  // Mengembalikan objek kosong jika tidak ada data
     }
 
-    res.json(rows[0]);  // Mengembalikan data simulasi tanpa simulatedDate
+    res.json(rows[0]);  // Mengembalikan data simulasi yang ditemukan tanpa simulatedDate
   } catch (e) {
     console.error("Error in getRealtimeSimulatedMicro:", e.message);  // Debug: Log error
     res.status(500).json({ error: e.message });
