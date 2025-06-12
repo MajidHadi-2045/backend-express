@@ -11,15 +11,19 @@ exports.getMicroLast10 = async (req, res) => {
     const simDateStr = targetDate.format('YYYY-MM-DD HH:mm:ss');  // Menggunakan waktu lokal saat ini setelah pengurangan
 
     const rows = await microclimateService.getLast10Micro(simDateStr);  // Panggil service dengan simDateStr
-    
-    // Jika tidak ada data, kirim response kosong
+
     if (rows.length === 0) {
-      return res.json({});  // Mengembalikan objek kosong jika tidak ada data
+      return res.status(404).json({});  // Mengembalikan objek kosong jika tidak ada data
     }
 
-    res.json({
-      data: rows  // Mengembalikan data yang ditemukan
-    });
+    // Mengembalikan data dalam format yang sesuai
+    res.json(rows.map(row => ({
+      timestamp: row.timestamp,
+      rainfall: row.rainfall,
+      temperature: row.temperature,
+      pyrano: row.pyrano,
+      humidity: row.humidity
+    })));
   } catch (e) {
     console.error("Error in getMicroLast10:", e.message);  // Debug: Log error
     res.status(500).json({ error: e.message });
@@ -36,12 +40,18 @@ exports.getRealtimeSimulatedMicro = async (req, res) => {
     const toleranceSec = 300;  // Toleransi 5 menit
     const rows = await microclimateService.getSimulatedMicro(simDateStr, toleranceSec);
 
-    // Jika tidak ada data, kirim response kosong
     if (rows.length === 0) {
-      return res.json({});  // Mengembalikan objek kosong jika tidak ada data
+      return res.status(404).json({});  // Mengembalikan objek kosong jika tidak ada data
     }
 
-    res.json(rows[0]);  // Mengembalikan data simulasi yang ditemukan tanpa simulatedDate
+    // Mengembalikan data dalam format yang sesuai
+    res.json({
+      timestamp: rows[0].timestamp,
+      rainfall: rows[0].rainfall,
+      temperature: rows[0].temperature,
+      pyrano: rows[0].pyrano,
+      humidity: rows[0].humidity
+    });
   } catch (e) {
     console.error("Error in getRealtimeSimulatedMicro:", e.message);  // Debug: Log error
     res.status(500).json({ error: e.message });
