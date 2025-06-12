@@ -1,30 +1,37 @@
 const carbonPredictService = require('../services/carbonPredictService');
 const moment = require('moment-timezone');
-const { Parser } = require('json2csv');
 
-// 10 data terakhir prediksi CO2
-exports.getPredictLast10 = async (req, res) => {
+// 10 data terakhir berdasarkan waktu simulasi dengan pengurangan 48 hari
+exports.getCO2Last10 = async (req, res) => {
   try {
-    const { sim_time } = req.query;  // Jika ada parameter sim_time, akan digunakan untuk simulasi
-    const rows = await carbonPredictService.getLast10Predict(sim_time);  // Panggil service dengan simDateStr
-    res.json(rows);
+    const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
+    const response = await carbonPredictService.getLast10CO2(sim_time);  // Panggil service dengan simDateStr
+    
+    // Jika tidak ada data, kirim response kosong
+    if (response.length === 0) {
+      return res.status(404).json({});  // Mengembalikan objek kosong jika tidak ada data
+    }
+
+    // Mengembalikan data dalam format yang sesuai
+    res.json(response);  // Mengembalikan data yang ditemukan tanpa "data" atau objek pembungkus lainnya
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 };
 
-
-// Simulasi tolerant
-exports.getRealtimeSimulatedPredict = async (req, res) => {
+// Simulasi data CO2 berdasarkan waktu simulasi dengan pengurangan 48 hari
+exports.getSimulatedCO2 = async (req, res) => {
   try {
-    const nowWIB = moment.tz('Asia/Jakarta');
-    const simDateWIB = nowWIB.clone().month(3).year(2025);
-    const simDateUTC = simDateWIB.clone().tz('UTC');
-    const simDateStr = simDateUTC.format('YYYY-MM-DD HH:mm:ss');
-    const toleranceSec = 300;
-    const rows = await carbonPredictService.getSimulatedPredict(simDateStr, toleranceSec);
-    if (!rows.length) return res.status(404).json({ error: 'No data found near simulated time' });
-    res.json(rows[0]);
+    const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
+    const response = await carbonPredictService.getSimulatedCO2(sim_time);  // Panggil service dengan simDateStr
+    
+    // Jika tidak ada data, kirim response kosong
+    if (response.length === 0) {
+      return res.status(404).json({});  // Mengembalikan objek kosong jika tidak ada data
+    }
+
+    // Mengembalikan data simulasi yang ditemukan
+    res.json(response[0]);  // Mengembalikan data simulasi tanpa simulatedDate
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -40,7 +47,7 @@ exports.getLivePrediction = async (req, res) => {
   }
 };
 
-// download
+// Download
 exports.downloadPredict = async (req, res) => {
   try {
     const { year, month, day, hour, minute } = req.query;
@@ -57,7 +64,7 @@ exports.downloadPredict = async (req, res) => {
   }
 };
 
-// downlad by range date
+// Download by range date
 exports.downloadPredictRange = async (req, res) => {
   try {
     const { start_date, end_date, limit } = req.query;
