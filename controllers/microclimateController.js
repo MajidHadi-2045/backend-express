@@ -5,30 +5,37 @@ const { Parser } = require('json2csv');
 // 10 data terakhir berdasarkan waktu sekarang
 exports.getMicroLast10 = async (req, res) => {
   try {
-    const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
-    const rows = await microclimateService.getLast10Micro(sim_time);  // Panggil service dengan simDateStr
+    // Mengurangi 48 hari untuk mendapatkan tanggal yang tepat
+    const now = moment();  // Waktu lokal saat ini
+    const targetDate = now.subtract(48, 'days');  // Mengurangi 48 hari dari tanggal sekarang
+    const simDateStr = targetDate.format('YYYY-MM-DD HH:mm:ss');  // Menggunakan waktu lokal saat ini setelah pengurangan
+
+    const rows = await microclimateService.getLast10Micro(simDateStr);  // Panggil service dengan simDateStr
     res.json({
-      data: rows  // Mengembalikan hanya data yang diambil tanpa simulatedDate
+      data: rows  // Mengembalikan data yang diambil tanpa simulatedDate
     });
   } catch (e) {
+    console.error("Error in getMicroLast10:", e.message);  // Debug: Log error
     res.status(500).json({ error: e.message });
   }
 };
 
 exports.getRealtimeSimulatedMicro = async (req, res) => {
   try {
-    const nowWIB = moment.tz('Asia/Jakarta');
-    const simDateWIB = nowWIB.clone().subtract(48, 'days');  // Mengurangi 48 hari dari tanggal sekarang
-    const simDateStr = simDateWIB.format('YYYY-MM-DD HH:mm:ss');
-    const toleranceSec = 300;
+    // Mengurangi 48 hari untuk mendapatkan tanggal yang tepat
+    const now = moment();  // Waktu lokal saat ini
+    const targetDate = now.subtract(48, 'days');  // Mengurangi 48 hari dari tanggal sekarang
+    const simDateStr = targetDate.format('YYYY-MM-DD HH:mm:ss');  // Menggunakan waktu lokal saat ini setelah pengurangan
 
+    const toleranceSec = 300;  // Toleransi 5 menit
     const rows = await microclimateService.getSimulatedMicro(simDateStr, toleranceSec);
-    if (!rows.length) return res.status(404).json({ error: 'No data found near simulated time' });
+    if (!rows.length) {
+      return res.status(404).json({ error: 'No data found near simulated time' });
+    }
 
-    res.json({
-      data: rows[0]  // Mengembalikan hanya data simulasi tanpa simulatedDate
-    });
+    res.json(rows[0]);  // Mengembalikan data simulasi tanpa simulatedDate
   } catch (e) {
+    console.error("Error in getRealtimeSimulatedMicro:", e.message);  // Debug: Log error
     res.status(500).json({ error: e.message });
   }
 };
