@@ -25,7 +25,6 @@ exports.getSimulatedCO2 = async (req, res) => {
     const { sim_time } = req.query;  // Dapatkan parameter sim_time dari query
     const response = await carbonPredictService.getSimulatedCO2(sim_time);  // Panggil service dengan simDateStr
     
-    // Jika tidak ada data, kirim response kosong
     if (response.length === 0) {
       return res.status(404).json({});  // Mengembalikan objek kosong jika tidak ada data
     }
@@ -47,13 +46,15 @@ exports.getLivePrediction = async (req, res) => {
   }
 };
 
-// Download
+// Download data CO2 berdasarkan parameter tanggal
 exports.downloadPredict = async (req, res) => {
   try {
     const { year, month, day, hour, minute } = req.query;
     const limit = parseInt(req.query.limit, 10) || 1000;
     const data = await carbonPredictService.downloadPredict(year, month, day, hour, minute, limit);
+
     if (!data.length) return res.status(404).json({ error: 'No data found' });
+
     const parser = new Parser({ fields: ['timestamp', 'co2_pred'] });
     const csv = parser.parse(data);
     res.header('Content-Type', 'text/csv');
@@ -73,7 +74,9 @@ exports.downloadPredictRange = async (req, res) => {
       end_date,
       limit ? parseInt(limit) : undefined
     );
+
     if (!data.length) return res.status(404).json({ error: 'No data found' });
+
     const parser = new Parser({ fields: ['timestamp', 'co2_pred'] });
     const csv = parser.parse(data);
     res.header('Content-Type', 'text/csv');
