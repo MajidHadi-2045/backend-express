@@ -10,20 +10,27 @@ exports.getCO2Last10 = async (req, res) => {
     const simDateStr = targetDate.format('YYYY-MM-DD HH:mm:ss');  // Menggunakan waktu lokal saat ini setelah pengurangan
 
     const rows = await carbonService.getLast10CO2(simDateStr);  // Panggil service dengan simDateStr
-    
+
+    // Tambahkan penyesuaian waktu +7 jam
+    const adjustedRows = rows.map(row => ({
+      ...row,
+      timestamp: moment(row.timestamp).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss')
+    }));
+
     // Jika tidak ada data, kirim response kosong
-    if (rows.length === 0) {
-      return res.status(404).json({});  // Mengembalikan objek kosong jika tidak ada data
+    if (adjustedRows.length === 0) {
+      return res.status(404).json({});
     }
 
     // Mengembalikan data dalam format yang sesuai
-    res.json(rows);  // Mengembalikan data yang ditemukan tanpa "data" atau objek pembungkus lainnya
+    res.json(adjustedRows);
   } catch (e) {
     console.error("Error in getCO2Last10:", e.message);  // Debug: Log error
     res.status(500).json({ error: e.message });
   }
 };
 
+// Simulasi data CO2
 exports.getRealtimeSimulatedCO2 = async (req, res) => {
   try {
     // Mengurangi 48 hari untuk mendapatkan tanggal yang tepat
@@ -36,8 +43,13 @@ exports.getRealtimeSimulatedCO2 = async (req, res) => {
     if (!rows.length) {
       return res.status(404).json({ error: 'No data found near simulated time' });
     }
-    
-    res.json(rows[0]);
+
+    // Adjust +7 jam
+    const adjustedRow = {
+      ...rows[0],
+      timestamp: moment(rows[0].timestamp).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss')
+    };
+    res.json(adjustedRow);
   } catch (e) {
     console.error("Error in getRealtimeSimulatedCO2:", e.message);  // Debug: Log error
     res.status(500).json({ error: e.message });
@@ -52,7 +64,7 @@ exports.getCO2Stream = (req, res) => {
   res.json(cache.latestCarbon);
 };
 
-// Dowload data CO2 berdasarkan parameter tanggal
+// Download data CO2 berdasarkan parameter tanggal
 exports.downloadCO2 = async (req, res) => {
   try {
     const { year, month, day, hour, minute } = req.query;
